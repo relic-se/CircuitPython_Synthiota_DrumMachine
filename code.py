@@ -354,6 +354,8 @@ while True:
     # toggle sequencer
     if synthiota.encoder_button.pressed:
         sequencer.active = not sequencer.active
+    if synthiota.encoder_button.long_press and not sequencer.active:
+        sequencer.position = 0
 
     if mode == MODE_PLAY:
 
