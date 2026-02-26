@@ -1,0 +1,4 @@
+adafruit-circuitpython-display-text
+circuitpython-synthiota
+circuitpython-synthvoice
+circuitpython-keymanager
