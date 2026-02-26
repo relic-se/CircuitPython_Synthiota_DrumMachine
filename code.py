@@ -66,7 +66,7 @@ effect_phaser.play(effect_distortion)
 effect_filter = Filter(
     filter=tuple([
         Biquad(
-            frequency=synthiota.sample_rate//2,
+            frequency=synthiota.sample_rate/2,
             mode=FilterMode.LOW_PASS,
         ) for i in range(2)
     ]),
@@ -235,7 +235,7 @@ PAGES = (
 
 left_slider_parameter = Parameter(
     effect_filter.filter, "frequency",
-    20, synthiota.sample_rate / 2, 2000,
+    20, synthiota.sample_rate / 2, synthiota.sample_rate / 2,
     shape=4, smoothing=0.05, window=False,
 )
 
