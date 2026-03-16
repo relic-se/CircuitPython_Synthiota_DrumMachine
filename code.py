@@ -383,20 +383,22 @@ while True:
     if synthiota.encoder_button.long_press and not sequencer.active:
         sequencer.position = 0
 
-    # change page
-    if synthiota.encoder.position != 0:
-        set_page(page_index=page[mode] + (1 if synthiota.encoder.position < 0 else -1))
-        synthiota.encoder.position = 0
+    if mode in {MODE_PLAY, MODE_EDIT}:
+        
+        # change page
+        if synthiota.encoder.position != 0:
+            set_page(page_index=page[mode] + (1 if synthiota.encoder.position < 0 else -1))
+            synthiota.encoder.position = 0
 
-    # update page parameters
-    for i, (label, parameter) in enumerate(PAGES[mode][page[mode]][1]):
-        parameter.update(synthiota.pots[i])
+        # update page parameters
+        for i, (label, parameter) in enumerate(PAGES[mode][page[mode]][1]):
+            parameter.update(synthiota.pots[i])
 
-    # update parameter ui bars
-    for i in range(min(8, len(modes_group[mode][page[mode]][2]))):
-        bar = modes_group[mode][page[mode]][2][i]
-        bar.height = int(BAR_HEIGHT * PAGES[mode][page[mode]][1][i][1].raw_value)
-        bar.y = synthiota.display.height - bar.height
+        # update parameter ui bars
+        for i in range(min(8, len(modes_group[mode][page[mode]][2]))):
+            bar = modes_group[mode][page[mode]][2][i]
+            bar.height = int(BAR_HEIGHT * PAGES[mode][page[mode]][1][i][1].raw_value)
+            bar.y = synthiota.display.height - bar.height
     
     if mode == MODE_PLAY:
 
