@@ -91,6 +91,17 @@ VOICES = (
     Ride(synth),
 )
 
+VOICE_NAMES = (
+    "KICK",
+    "SNRE",
+    "HHCL",
+    "HHOP",
+    "HTOM",
+    "MTOM",
+    "FTOM",
+    "RIDE",
+)
+
 sequencer = Sequencer(length=16, tracks=8)
 
 def sequencer_enabled(active: bool) -> None:
@@ -200,36 +211,55 @@ class Parameter:
 
 
 PAGES = (
-    (
-        "DIST",
+    tuple([
         (
-            ("GN", Parameter(effect_distortion, "drive", value=0.5)),
-            ("MX", Parameter(effect_distortion, "mix")),
+            VOICE_NAMES[i],
+            (
+                ("TUN", Parameter(VOICES[i], "tune", -12, 12, 0)),
+                ("LVL", Parameter(VOICES[i], "amplitude", value=1)),
+                ("DCY", Parameter(VOICES[i], "decay_time", -1, 1, 0)),
+            )
         )
+        for i in range(len(VOICES))
+    ]),
+    (
+        (
+            "SQNC",
+            tuple()
+        ),
     ),
     (
-        "PHSR",
         (
-            ("PR", Parameter(effect_phaser.frequency, "rate", 0.1, 8, 1, 3)),
-            ("PF", Parameter(effect_phaser, "feedback", value=0.5)),
-            ("PM", Parameter(effect_phaser, "mix")),
-        )
-    ),
-    (
-        "ECHO",
+            "DIST",
+            (
+                ("GN", Parameter(effect_distortion, "drive", value=0.5)),
+                ("MX", Parameter(effect_distortion, "mix")),
+            )
+        ),
         (
-            ("TM", Parameter(effect_echo, "delay_ms", 25, 500, 250, 2)),
-            ("DC", Parameter(effect_echo, "decay", value=0.25)),
-            ("MX", Parameter(effect_echo, "mix")),
-        )
-    ),
-    (
-        "RVRB",
+            "PHSR",
+            (
+                ("PR", Parameter(effect_phaser.frequency, "rate", 0.1, 8, 1, 3)),
+                ("PF", Parameter(effect_phaser, "feedback", value=0.5)),
+                ("PM", Parameter(effect_phaser, "mix")),
+            )
+        ),
         (
-            ("SZ", Parameter(effect_reverb, "roomsize", value=0.7)),
-            ("DMP", Parameter(effect_reverb, "damp", value=0.3)),
-            ("MX", Parameter(effect_reverb, "mix")),
-        )
+            "ECHO",
+            (
+                ("TM", Parameter(effect_echo, "delay_ms", 25, 500, 250, 2)),
+                ("DC", Parameter(effect_echo, "decay", value=0.25)),
+                ("MX", Parameter(effect_echo, "mix")),
+            )
+        ),
+        (
+            "RVRB",
+            (
+                ("SZ", Parameter(effect_reverb, "roomsize", value=0.7)),
+                ("DMP", Parameter(effect_reverb, "damp", value=0.3)),
+                ("MX", Parameter(effect_reverb, "mix")),
+            )
+        ),
     ),
 )
 
@@ -263,75 +293,64 @@ root_group.append(Label(
     anchor_point=(0, 0.5),
 ))
 
-pages_group = displayio.Group()
-root_group.append(pages_group)
+modes_group = displayio.Group()
+root_group.append(modes_group)
 
-for i, (title, parameters) in enumerate(PAGES):
-    page_group = displayio.Group()
-    page_group.hidden = True
-    pages_group.append(page_group)
+for pages in PAGES:
+    pages_group = displayio.Group()
+    pages_group.hidden = True
+    modes_group.append(pages_group)
 
-    page_group.append(Label(
-        font=FONT, text=title, color=0xFFFFFF, scale=2,
-        anchored_position=(synthiota.display.width-3, TITLE_HEIGHT//2),
-        anchor_point=(1, 0.5),
-    ))
+    for i, (title, parameters) in enumerate(pages):
+        page_group = displayio.Group()
+        page_group.hidden = True
+        pages_group.append(page_group)
 
-    label_group = displayio.Group()
-    page_group.append(label_group)
-
-    bar_group = displayio.Group()
-    page_group.append(bar_group)
-    
-    for j, (label, parameter) in enumerate(parameters):
-        label_group.append(Label(
-            font=FONT, text=label, color=0xFFFFFF,
-            anchored_position=(j*BAR_WIDTH+BAR_WIDTH//2, TITLE_HEIGHT+LABEL_HEIGHT//2),
-            anchor_point=(0.5, 0.5),
-        ))
-        bar_group.append(Rectangle(
-            pixel_shader=palette, color_index=1,
-            width=BAR_WIDTH, height=BAR_HEIGHT,
-            x=j*BAR_WIDTH, y=TITLE_HEIGHT+LABEL_HEIGHT,
+        page_group.append(Label(
+            font=FONT, text=title, color=0xFFFFFF, scale=2,
+            anchored_position=(synthiota.display.width-3, TITLE_HEIGHT//2),
+            anchor_point=(1, 0.5),
         ))
 
-page = None
-def set_page(index: int = 0) -> None:
-    global page
-    index = min(max(index, 0), len(PAGES)-1)
-    if index == page:
-        return
-    if page is not None:
-        for label, parameter in PAGES[page][1]:
-            parameter.deactivate()
-    page = index
-    for i, page_group in enumerate(pages_group):
-        page_group.hidden = i != page
-set_page()
+        label_group = displayio.Group()
+        page_group.append(label_group)
 
-track = None
-def set_track(index: int = 0) -> None:
-    global track
-    index = min(max(index, 0), sequencer.tracks-1)
-    if index == track:
-        return
-    track = index
-    # TODO: set track label
-set_track()
+        bar_group = displayio.Group()
+        page_group.append(bar_group)
+        
+        for j, (label, parameter) in enumerate(parameters):
+            label_group.append(Label(
+                font=FONT, text=label, color=0xFFFFFF,
+                anchored_position=(j*BAR_WIDTH+BAR_WIDTH//2, TITLE_HEIGHT+LABEL_HEIGHT//2),
+                anchor_point=(0.5, 0.5),
+            ))
+            bar_group.append(Rectangle(
+                pixel_shader=palette, color_index=1,
+                width=BAR_WIDTH, height=BAR_HEIGHT,
+                x=j*BAR_WIDTH, y=TITLE_HEIGHT+LABEL_HEIGHT,
+            ))
 
 mode = None
-def set_mode(value: int = 0) -> None:
-    global mode, page
-    value = min(max(value, 0), 2)
-    if value == mode:
+page = [None] * len(PAGES)
+def set_page(mode_index: int = None, page_index: int = None) -> None:
+    global page, mode
+    mode_index = mode if mode_index is None else min(max(mode_index, 0), len(PAGES)-1)
+    page_index = page[mode_index] if page_index is None else min(max(page_index, 0), len(PAGES[mode_index])-1)
+    if page_index is None:
+        page_index = 0
+    if mode_index == mode and page[mode_index] == page_index:
         return
-    mode = value
-    pages_group.hidden = mode != MODE_PLAY
-    if mode == MODE_PLAY:
-        for label, parameter in PAGES[page][1]:
+    if mode is not None and page[mode] is not None:
+        for label, parameter in PAGES[mode][page[mode]][1]:
             parameter.deactivate()
+    mode = mode_index
+    page[mode] = page_index
+    for i, pages_group in enumerate(modes_group):
+        pages_group.hidden = i != mode
+        for j, page_group in enumerate(pages_group):
+            page_group.hidden = i != mode or j != page[mode]
     synthiota.mode_leds = [MODE_LEDS[i] * (i == mode) for i in range(3)]
-set_mode(MODE_PLAY)
+set_page(mode_index=MODE_PLAY, page_index=0)
 
 last_touched_steps = [False] * 16
 while True:
@@ -343,9 +362,9 @@ while True:
 
     # change mode
     if synthiota.up_button.pressed:
-        set_mode(mode + 1)
+        set_page(mode_index=mode + 1)
     if synthiota.down_button.pressed:
-        set_mode(mode - 1)
+        set_page(mode_index=mode - 1)
 
     # update sliders
     left_slider_parameter.update(synthiota.left_slider.value)
@@ -357,16 +376,22 @@ while True:
     if synthiota.encoder_button.long_press and not sequencer.active:
         sequencer.position = 0
 
+    # change page
+    if synthiota.encoder.position != 0:
+        set_page(page_index=page[mode] + (1 if synthiota.encoder.position < 0 else -1))
+        synthiota.encoder.position = 0
+
+    # update page parameters
+    for i, (label, parameter) in enumerate(PAGES[mode][page[mode]][1]):
+        parameter.update(synthiota.pots[i])
+
+    # update parameter ui bars
+    for i in range(min(8, len(modes_group[mode][page[mode]][2]))):
+        bar = modes_group[mode][page[mode]][2][i]
+        bar.height = int(BAR_HEIGHT * PAGES[mode][page[mode]][1][i][1].raw_value)
+        bar.y = synthiota.display.height - bar.height
+    
     if mode == MODE_PLAY:
-
-        # change page
-        if synthiota.encoder.position != 0:
-            set_page(page + (1 if synthiota.encoder.position < 0 else -1))
-            synthiota.encoder.position = 0
-
-        # update page parameters
-        for i, (label, parameter) in enumerate(PAGES[page][1]):
-            parameter.update(synthiota.pots[i])
 
         # sample playback
         for i, voice in enumerate(VOICES):
@@ -375,30 +400,23 @@ while True:
             elif not touched_steps[i] and last_touched_steps[i]:
                 voice.release()
 
-        # update parameter ui bars
-        for i in range(min(8, len(pages_group[page][2]))):
-            bar = pages_group[page][2][i]
-            bar.height = int(BAR_HEIGHT * PAGES[page][1][i][1].raw_value)
-            bar.y = synthiota.display.height - bar.height
+        # indicate voices
+        for i in range(len(VOICES)):
+            step_leds[i] = 0xFF0000
 
     elif mode == MODE_EDIT:
-
-        # change sequencer track
-        if synthiota.encoder.position != 0:
-            set_track(track + (1 if synthiota.encoder.position < 0 else -1))
-            synthiota.encoder.position = 0
 
         # edit sequence with step touches
         for i, value in enumerate(touched_steps):
             if value and not last_touched_steps[i]:
-                if not sequencer.has_note(i, track):
-                    sequencer.set_note(i, track+1, track=track)
+                if not sequencer.has_note(i, page[MODE_EDIT]):
+                    sequencer.set_note(i, page[MODE_EDIT]+1, track=page[MODE_EDIT])
                 else:
-                    sequencer.remove_note(i, track)
+                    sequencer.remove_note(i, page[MODE_EDIT])
         
         # draw step positions
         for i in range(16):
-            if sequencer.has_note(i, track):
+            if sequencer.has_note(i, page[MODE_EDIT]):
                 step_leds[i] = 0xFF0000
 
     elif mode == MODE_SEQUENCER:
