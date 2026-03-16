@@ -216,7 +216,7 @@ PAGES = (
             VOICE_NAMES[i],
             (
                 ("TUN", Parameter(VOICES[i], "tune", -12, 12, 0)),
-                ("LVL", Parameter(VOICES[i], "amplitude", value=1)),
+                ("LVL", Parameter(VOICES[i], "amplitude", value=0.5)),
                 ("DCY", Parameter(VOICES[i], "decay_time", -1, 1, 0)),
             )
         )
