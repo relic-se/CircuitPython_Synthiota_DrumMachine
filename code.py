@@ -102,6 +102,13 @@ VOICE_NAMES = (
     "RIDE",
 )
 
+def voice_press(voice: int = None, velocity: float = 1.0) -> None:
+    if 0 <= voice < len(VOICES):
+        VOICES[voice].press(velocity)
+        if voice in {2, 3}: # Hat
+            for note in VOICES[((voice + 1) % 2) + 2].notes:
+                synth.release(note)
+
 sequencer = Sequencer(length=16, tracks=8)
 
 def sequencer_enabled(active: bool) -> None:
@@ -111,7 +118,7 @@ def sequencer_enabled(active: bool) -> None:
 sequencer.on_enabled = sequencer_enabled
 
 def sequencer_press(notenum: int, velocity: float) -> None:
-    VOICES[notenum-1].press(velocity)
+    voice_press(notenum-1, velocity)
 sequencer.on_press = sequencer_press
 
 def sequencer_release(notenum: int) -> None:
@@ -396,7 +403,7 @@ while True:
         # sample playback
         for i, voice in enumerate(VOICES):
             if touched_steps[i] and not last_touched_steps[i]:
-                voice.press()
+                voice_press(i)
             elif not touched_steps[i] and last_touched_steps[i]:
                 voice.release()
 
