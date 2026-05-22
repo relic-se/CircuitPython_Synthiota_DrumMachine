@@ -588,13 +588,20 @@ while True:
 
     elif mode == MODE_SEQUENCER:
 
-        # TODO: change sequence pattern based on step touch
-        # TODO: indicate current sequence pattern
+        # allow sequence selection
+        for i, value in enumerate(touched_steps):
+            if value and not last_touched_steps[i]:
+                dump_sequence()
+                load_sequence(i)
+                break  # only allow first sequence selection
 
         # indicate sequence length
         for i in range(16):
             if sequencer.loop_start <= i < sequencer.loop_end:
                 step_leds[i] = 0xFF0000
+
+        # indicate current sequence
+        step_leds[current_sequence] = 0x0000FF
 
     # update leds
     step_leds[sequencer.position] = 0x00FF00
