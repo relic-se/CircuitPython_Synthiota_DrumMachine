@@ -19,19 +19,21 @@ from relic_keymanager import Sequencer
 from relic_synthiota import Synthiota
 from relic_synthvoice.percussive import Kick, Snare, ClosedHat, OpenHat, HighTom, MidTom, FloorTom, Ride
 
+STEREO = False
+
 MODE_EDIT = 0
 MODE_SEQUENCER = 1
 MODE_PLAY = 2
 MODE_LEDS = (0xFF0000, 0x0000FF, 0x00FF00)
 
 # improve performance with an overclock
-microcontroller.cpu.frequency = 300_000_000
+microcontroller.cpu.frequency = 320_000_000 if STEREO else 300_000_000
 
 # hardware and audio
 displayio.release_displays()
 synthiota = Synthiota(
-    sample_rate=48000,
-    channel_count=1,
+    sample_rate=32000 if STEREO else 48000,
+    channel_count=2 if STEREO else 1,
 )
 
 ARGS = {
@@ -270,11 +272,15 @@ PAGES = (
     tuple([
         (
             VOICE_NAMES[i],
-            (
-                ("TUN", Parameter(VOICES[i], "tune", -12, 12, 0)),
-                ("LVL", Parameter(VOICES[i], "amplitude", value=0.5)),
-                ("DCY", Parameter(VOICES[i], "decay_time", -1, 1, 0)),
-            )
+            tuple(filter(
+                lambda x: x is not None,
+                (
+                    ("TUN", Parameter(VOICES[i], "tune", -12, 12, 0)),
+                    ("LVL", Parameter(VOICES[i], "amplitude", value=0.5)),
+                    ("DCY", Parameter(VOICES[i], "decay_time", -1, 1, 0)),
+                    ("PAN", Parameter(VOICES[i], "pan", -1, 1, 0)) if STEREO else None,
+                )
+            ))
         )
         for i in range(len(VOICES))
     ]),
