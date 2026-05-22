@@ -232,7 +232,11 @@ PAGES = (
     (
         (
             "SQNC",
-            tuple()
+            (
+                ("BPM", Parameter(sequencer, "bpm", 40, 240, 120, round=True)),
+                ("SRT", Parameter(sequencer, "loop_start", 0, 15, 0, round=True)),
+                ("END", Parameter(sequencer, "loop_end", 1, 16, 16, round=True)),
+            )
         ),
     ),
     (
@@ -319,23 +323,24 @@ for pages in PAGES:
             anchor_point=(1, 0.5),
         ))
 
-        label_group = displayio.Group()
-        page_group.append(label_group)
+        if parameters:
+            label_group = displayio.Group()
+            page_group.append(label_group)
 
-        bar_group = displayio.Group()
-        page_group.append(bar_group)
-        
-        for j, (label, parameter) in enumerate(parameters):
-            label_group.append(Label(
-                font=FONT, text=label, color=0xFFFFFF,
-                anchored_position=(j*BAR_WIDTH+BAR_WIDTH//2, TITLE_HEIGHT+LABEL_HEIGHT//2),
-                anchor_point=(0.5, 0.5),
-            ))
-            bar_group.append(Rectangle(
-                pixel_shader=palette, color_index=1,
-                width=BAR_WIDTH, height=BAR_HEIGHT,
-                x=j*BAR_WIDTH, y=TITLE_HEIGHT+LABEL_HEIGHT,
-            ))
+            bar_group = displayio.Group()
+            page_group.append(bar_group)
+            
+            for j, (label, parameter) in enumerate(parameters):
+                label_group.append(Label(
+                    font=FONT, text=label, color=0xFFFFFF,
+                    anchored_position=(j*BAR_WIDTH+BAR_WIDTH//2, TITLE_HEIGHT+LABEL_HEIGHT//2),
+                    anchor_point=(0.5, 0.5),
+                ))
+                bar_group.append(Rectangle(
+                    pixel_shader=palette, color_index=1,
+                    width=BAR_WIDTH, height=BAR_HEIGHT,
+                    x=j*BAR_WIDTH, y=TITLE_HEIGHT+LABEL_HEIGHT,
+                ))
 
 mode = None
 page = [None] * len(PAGES)
@@ -358,6 +363,8 @@ def set_page(mode_index: int = None, page_index: int = None) -> None:
             page_group.hidden = i != mode or j != page[mode]
     synthiota.mode_leds = [MODE_LEDS[i] * (i == mode) for i in range(3)]
 set_page(mode_index=MODE_PLAY, page_index=0)
+
+# loop
 
 last_touched_steps = [False] * 16
 while True:
@@ -383,22 +390,20 @@ while True:
     if synthiota.encoder_button.long_press and not sequencer.active:
         sequencer.position = 0
 
-    if mode in {MODE_PLAY, MODE_EDIT}:
-        
-        # change page
-        if synthiota.encoder.position != 0:
-            set_page(page_index=page[mode] + (1 if synthiota.encoder.position < 0 else -1))
-            synthiota.encoder.position = 0
+    # change page
+    if synthiota.encoder.position != 0:
+        set_page(page_index=page[mode] + (1 if synthiota.encoder.position < 0 else -1))
+        synthiota.encoder.position = 0
 
-        # update page parameters
-        for i, (label, parameter) in enumerate(PAGES[mode][page[mode]][1]):
-            parameter.update(synthiota.pots[i])
+    # update page parameters
+    for i, (label, parameter) in enumerate(PAGES[mode][page[mode]][1]):
+        parameter.update(synthiota.pots[i])
 
-        # update parameter ui bars
-        for i in range(min(8, len(modes_group[mode][page[mode]][2]))):
-            bar = modes_group[mode][page[mode]][2][i]
-            bar.height = int(BAR_HEIGHT * PAGES[mode][page[mode]][1][i][1].raw_value)
-            bar.y = synthiota.display.height - bar.height
+    # update parameter ui bars
+    for i in range(min(8, len(modes_group[mode][page[mode]][2]))):
+        bar = modes_group[mode][page[mode]][2][i]
+        bar.height = int(BAR_HEIGHT * PAGES[mode][page[mode]][1][i][1].raw_value)
+        bar.y = synthiota.display.height - bar.height
     
     if mode == MODE_PLAY:
 
@@ -430,10 +435,13 @@ while True:
 
     elif mode == MODE_SEQUENCER:
 
-        # control bpm with encoder
-        if synthiota.encoder.position != 0:
-            sequencer.bpm += -synthiota.encoder.position
-            synthiota.encoder.position = 0
+        # TODO: change sequence pattern based on step touch
+        # TODO: indicate current sequence pattern
+
+        # indicate sequence length
+        for i in range(16):
+            if sequencer.loop_start <= i < sequencer.loop_end:
+                step_leds[i] = 0xFF0000
 
     # update leds
     step_leds[sequencer.position] = 0x00FF00
