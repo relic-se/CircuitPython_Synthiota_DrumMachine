@@ -147,15 +147,18 @@ def dump_sequence() -> None:
             else:
                 sequences[current_sequence][i][j] = None
 
-def load_sequence(index: int = None) -> None:
+def load_sequence(index: int = None, dump: bool = True) -> None:
     global sequences, current_sequence, next_sequence
     if index is not None:
         next_sequence = index
     if next_sequence is None:
         return
 
-    next_sequence = min(max(next_sequence, 0), SEQUENCES)
+    if dump:
+        dump_sequence()
 
+    next_sequence = min(max(next_sequence, 0), SEQUENCES)
+    
     for i in range(sequencer.tracks):
         for j in range(sequencer.length):
             if sequences[next_sequence][i][j] is None:
@@ -346,7 +349,10 @@ def get_save_data() -> dict:
         "sequences": sequences,
     }
 
-def save() -> None:
+def save(dump: bool = True) -> None:
+    if dump:
+        dump_sequence()
+        
     with open(SAVE_LOCATION, "w") as f:
         json.dump(get_save_data(), f)
 
@@ -466,7 +472,7 @@ else:
                             for k in range(min(len(sequences[i][j]), len(data["sequences"][i][j]))):
                                 if data["sequences"][i][j][k] is None or isinstance(data["sequences"][i][j][k], int):
                                     sequences[i][j][k] = data["sequences"][i][j][k]
-            load_sequence(0)
+            load_sequence(0, dump=False)
     
     status_label.text = "Complete!"
     synthiota.pot_leds = [0x00FF00] * 8
@@ -502,9 +508,6 @@ while True:
 
         # indicate leds
         synthiota.pot_leds = [0xFFA500] * 8
-
-        # dump current sequence
-        dump_sequence()
 
         # perform save
         save()
