@@ -319,23 +319,45 @@ for pages in PAGES:
             anchor_point=(1, 0.5),
         ))
 
-        label_group = displayio.Group()
-        page_group.append(label_group)
+        if parameters:
+            label_group = displayio.Group()
+            page_group.append(label_group)
 
-        bar_group = displayio.Group()
-        page_group.append(bar_group)
-        
-        for j, (label, parameter) in enumerate(parameters):
-            label_group.append(Label(
-                font=FONT, text=label, color=0xFFFFFF,
-                anchored_position=(j*BAR_WIDTH+BAR_WIDTH//2, TITLE_HEIGHT+LABEL_HEIGHT//2),
-                anchor_point=(0.5, 0.5),
-            ))
-            bar_group.append(Rectangle(
-                pixel_shader=palette, color_index=1,
-                width=BAR_WIDTH, height=BAR_HEIGHT,
-                x=j*BAR_WIDTH, y=TITLE_HEIGHT+LABEL_HEIGHT,
-            ))
+            bar_group = displayio.Group()
+            page_group.append(bar_group)
+            
+            for j, (label, parameter) in enumerate(parameters):
+                label_group.append(Label(
+                    font=FONT, text=label, color=0xFFFFFF,
+                    anchored_position=(j*BAR_WIDTH+BAR_WIDTH//2, TITLE_HEIGHT+LABEL_HEIGHT//2),
+                    anchor_point=(0.5, 0.5),
+                ))
+                bar_group.append(Rectangle(
+                    pixel_shader=palette, color_index=1,
+                    width=BAR_WIDTH, height=BAR_HEIGHT,
+                    x=j*BAR_WIDTH, y=TITLE_HEIGHT+LABEL_HEIGHT,
+                ))
+
+bpm_group = displayio.Group()
+modes_group[MODE_SEQUENCER][0].append(bpm_group)
+
+bpm_group.append(Label(
+    font=FONT, text="bpm", color=0xFFFFFF, scale=2,
+    anchored_position=(synthiota.display.width - 4, synthiota.display.height - 1),
+    anchor_point=(1.0, 1.0),
+))
+
+bpm_label = Label(
+    font=FONT, text="", color=0xFFFFFF, scale=4,
+    anchored_position=(0, synthiota.display.height),
+    anchor_point=(0.0, 1.0),
+)
+bpm_group.append(bpm_label)
+
+def set_bpm(delta: int = 0) -> None:
+    sequencer.bpm += delta
+    bpm_label.text = "{:03d}".format(int(sequencer.bpm))
+set_bpm()
 
 mode = None
 page = [None] * len(PAGES)
@@ -358,6 +380,8 @@ def set_page(mode_index: int = None, page_index: int = None) -> None:
             page_group.hidden = i != mode or j != page[mode]
     synthiota.mode_leds = [MODE_LEDS[i] * (i == mode) for i in range(3)]
 set_page(mode_index=MODE_PLAY, page_index=0)
+
+# loop
 
 last_touched_steps = [False] * 16
 while True:
@@ -432,7 +456,7 @@ while True:
 
         # control bpm with encoder
         if synthiota.encoder.position != 0:
-            sequencer.bpm += -synthiota.encoder.position
+            set_bpm(-synthiota.encoder.position)
             synthiota.encoder.position = 0
 
     # update leds
