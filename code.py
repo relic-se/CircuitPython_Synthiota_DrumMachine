@@ -120,12 +120,6 @@ SEQUENCES = 16
 
 sequencer = Sequencer(length=16, tracks=8)
 
-def sequencer_enabled(active: bool) -> None:
-    if not active:
-        for voice in VOICES:
-            voice.release()
-sequencer.on_enabled = sequencer_enabled
-
 def sequencer_press(notenum: int, velocity: float) -> None:
     voice_press(notenum-1, velocity)
 sequencer.on_press = sequencer_press
@@ -147,15 +141,18 @@ def dump_sequence() -> None:
             else:
                 sequences[current_sequence][i][j] = None
 
-def load_sequence(index: int = None) -> None:
+def load_sequence(index: int = None, dump: bool = True) -> None:
     global sequences, current_sequence, next_sequence
     if index is not None:
         next_sequence = index
     if next_sequence is None:
         return
 
-    next_sequence = min(max(next_sequence, 0), SEQUENCES)
+    if dump:
+        dump_sequence()
 
+    next_sequence = min(max(next_sequence, 0), SEQUENCES)
+    
     for i in range(sequencer.tracks):
         for j in range(sequencer.length):
             if sequences[next_sequence][i][j] is None:
@@ -165,6 +162,17 @@ def load_sequence(index: int = None) -> None:
 
     current_sequence = next_sequence
     next_sequence = None
+
+def sequencer_enabled(active: bool) -> None:
+    if not active:
+        for voice in VOICES:
+            voice.release()
+        load_sequence()
+sequencer.on_enabled = sequencer_enabled
+
+def sequencer_loop(pos: int) -> None:
+    load_sequence()
+sequencer.on_loop = sequencer_loop
 
 # parameters
 PARAM_WINDOW = 0.01
@@ -346,7 +354,10 @@ def get_save_data() -> dict:
         "sequences": sequences,
     }
 
-def save() -> None:
+def save(dump: bool = True) -> None:
+    if dump:
+        dump_sequence()
+
     with open(SAVE_LOCATION, "w") as f:
         json.dump(get_save_data(), f)
 
@@ -466,7 +477,7 @@ else:
                             for k in range(min(len(sequences[i][j]), len(data["sequences"][i][j]))):
                                 if data["sequences"][i][j][k] is None or isinstance(data["sequences"][i][j][k], int):
                                     sequences[i][j][k] = data["sequences"][i][j][k]
-            load_sequence(0)
+            load_sequence(0, dump=False)
     
     status_label.text = "Complete!"
     synthiota.pot_leds = [0x00FF00] * 8
@@ -502,9 +513,6 @@ while True:
 
         # indicate leds
         synthiota.pot_leds = [0xFFA500] * 8
-
-        # dump current sequence
-        dump_sequence()
 
         # perform save
         save()
@@ -590,9 +598,10 @@ while True:
 
         # allow sequence selection
         for i, value in enumerate(touched_steps):
-            if value and not last_touched_steps[i]:
-                dump_sequence()
-                load_sequence(i)
+            if value and not last_touched_steps[i] and i != current_sequence:
+                next_sequence = i
+                if not sequencer.active:
+                    load_sequence()
                 break  # only allow first sequence selection
 
         # indicate sequence length
@@ -602,6 +611,9 @@ while True:
 
         # indicate current sequence
         step_leds[current_sequence] = 0x0000FF
+
+        if next_sequence is not None:
+            step_leds[next_sequence] = 0xFFFF00
 
     # update leds
     step_leds[sequencer.position] = 0x00FF00
