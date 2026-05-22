@@ -234,7 +234,8 @@ PAGES = (
             "SQNC",
             (
                 ("BPM", Parameter(sequencer, "bpm", 40, 240, 120, round=True)),
-                ("LEN", Parameter(sequencer, "length", 1, 16, 16, round=True)),
+                ("SRT", Parameter(sequencer, "loop_start", 0, 15, 0, round=True)),
+                ("END", Parameter(sequencer, "loop_end", 1, 16, 16, round=True)),
             )
         ),
     ),
@@ -439,7 +440,7 @@ while True:
 
         # indicate sequence length
         for i in range(16):
-            if i < sequencer.length:
+            if sequencer.loop_start <= i < sequencer.loop_end:
                 step_leds[i] = 0xFF0000
 
     # update leds
