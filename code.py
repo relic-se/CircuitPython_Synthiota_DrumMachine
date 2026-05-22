@@ -6,9 +6,12 @@ from audiodelays import Echo
 from audiofilters import Distortion, DistortionMode, Filter, Phaser
 from audiofreeverb import Freeverb
 import displayio
+import json
 import microcontroller
+import os
 from synthio import Biquad, FilterMode, LFO, Synthesizer
 from terminalio import FONT
+import time
 from vectorio import Rectangle
 
 from adafruit_display_text.label import Label
@@ -80,6 +83,8 @@ synth = Synthesizer(
 )
 effect_filter.play(synth)
 
+# Voices
+
 VOICES = (
     Kick(synth),
     Snare(synth),
@@ -109,6 +114,10 @@ def voice_press(voice: int = None, velocity: float = 1.0) -> None:
             for note in VOICES[((voice + 1) % 2) + 2].notes:
                 synth.release(note)
 
+# Sequencer
+
+SEQUENCES = 16
+
 sequencer = Sequencer(length=16, tracks=8)
 
 def sequencer_enabled(active: bool) -> None:
@@ -124,6 +133,38 @@ sequencer.on_press = sequencer_press
 def sequencer_release(notenum: int) -> None:
     VOICES[notenum-1].release()
 sequencer.on_release = sequencer_release
+
+sequences = [[[None for k in range(sequencer.length)] for j in range(sequencer.tracks)] for i in range(SEQUENCES)]
+current_sequence = 0
+next_sequence = None
+
+def dump_sequence() -> None:
+    global sequences, current_sequence
+    for i in range(sequencer.tracks):
+        for j in range(sequencer.length):
+            if sequencer.has_note(j, i):
+                sequences[current_sequence][i][j] = sequencer.get_note(j, track=i)[0]
+            else:
+                sequences[current_sequence][i][j] = None
+
+def load_sequence(index: int = None) -> None:
+    global sequences, current_sequence, next_sequence
+    if index is not None:
+        next_sequence = index
+    if next_sequence is None:
+        return
+
+    next_sequence = min(max(next_sequence, 0), SEQUENCES)
+
+    for i in range(sequencer.tracks):
+        for j in range(sequencer.length):
+            if sequences[next_sequence][i][j] is None:
+                sequencer.remove_note(j, track=i)
+            else:
+                sequencer.set_note(j, sequences[next_sequence][i][j], track=i)
+
+    current_sequence = next_sequence
+    next_sequence = None
 
 # parameters
 PARAM_WINDOW = 0.01
@@ -286,6 +327,29 @@ right_slider_parameter = Parameter(
     shape=2, smoothing=0.05, window=False,
 )
 
+# saving
+SAVE_LOCATION = "/synthiota-drum-machine.json"
+
+def get_parameter_data() -> dict:
+    data = {}
+    for pages in PAGES:
+        for i, (title, parameters) in enumerate(pages):
+            data[title] = {}
+            for j, (label, parameter) in enumerate(parameters):
+                data[title][label] = parameter.value
+    return data
+
+def get_save_data() -> dict:
+    global sequences
+    return {
+        "parameters": get_parameter_data(),
+        "sequences": sequences,
+    }
+
+def save() -> None:
+    with open(SAVE_LOCATION, "w") as f:
+        json.dump(get_save_data(), f)
+
 # ui
 TITLE_HEIGHT = 20
 LABEL_HEIGHT = 10
@@ -303,6 +367,14 @@ root_group.append(Label(
     anchored_position=(0, TITLE_HEIGHT//2),
     anchor_point=(0, 0.5),
 ))
+
+status_label = Label(
+    font=FONT, text="", color=0xFFFFFF, scale=2,
+    anchored_position=(synthiota.display.width//2, (synthiota.display.height-TITLE_HEIGHT)//2+TITLE_HEIGHT),
+    anchor_point=(0.5, 0.5),
+)
+status_label.hidden = True
+root_group.append(status_label)
 
 modes_group = displayio.Group()
 root_group.append(modes_group)
@@ -323,24 +395,23 @@ for pages in PAGES:
             anchor_point=(1, 0.5),
         ))
 
-        if parameters:
-            label_group = displayio.Group()
-            page_group.append(label_group)
+        label_group = displayio.Group()
+        page_group.append(label_group)
 
-            bar_group = displayio.Group()
-            page_group.append(bar_group)
-            
-            for j, (label, parameter) in enumerate(parameters):
-                label_group.append(Label(
-                    font=FONT, text=label, color=0xFFFFFF,
-                    anchored_position=(j*BAR_WIDTH+BAR_WIDTH//2, TITLE_HEIGHT+LABEL_HEIGHT//2),
-                    anchor_point=(0.5, 0.5),
-                ))
-                bar_group.append(Rectangle(
-                    pixel_shader=palette, color_index=1,
-                    width=BAR_WIDTH, height=BAR_HEIGHT,
-                    x=j*BAR_WIDTH, y=TITLE_HEIGHT+LABEL_HEIGHT,
-                ))
+        bar_group = displayio.Group()
+        page_group.append(bar_group)
+        
+        for j, (label, parameter) in enumerate(parameters):
+            label_group.append(Label(
+                font=FONT, text=label, color=0xFFFFFF,
+                anchored_position=(j*BAR_WIDTH+BAR_WIDTH//2, TITLE_HEIGHT+LABEL_HEIGHT//2),
+                anchor_point=(0.5, 0.5),
+            ))
+            bar_group.append(Rectangle(
+                pixel_shader=palette, color_index=1,
+                width=BAR_WIDTH, height=BAR_HEIGHT,
+                x=j*BAR_WIDTH, y=TITLE_HEIGHT+LABEL_HEIGHT,
+            ))
 
 mode = None
 page = [None] * len(PAGES)
@@ -364,6 +435,48 @@ def set_page(mode_index: int = None, page_index: int = None) -> None:
     synthiota.mode_leds = [MODE_LEDS[i] * (i == mode) for i in range(3)]
 set_page(mode_index=MODE_PLAY, page_index=0)
 
+# load save data
+try:
+    os.stat(SAVE_LOCATION)
+except OSError:
+    pass
+else:
+    modes_group.hidden = True
+    status_label.text = "Loading..."
+    status_label.hidden = False
+    synthiota.pot_leds = [0xFFA500] * 8
+    synthiota.audio.stop()
+
+    with open(SAVE_LOCATION, "r") as f:
+        data = json.load(f)
+
+        if "parameters" in data and isinstance(data["parameters"], dict):
+            for pages in PAGES:
+                for i, (title, parameters) in enumerate(pages):
+                    if title in data["parameters"]:
+                        for j, (label, parameter) in enumerate(parameters):
+                            if label in data["parameters"][title] and isinstance(data["parameters"][title][label], float):
+                                parameter.value = data["parameters"][title][label]
+
+        if "sequences" in data and isinstance(data["sequences"], list):
+            for i in range(min(len(sequences), len(data["sequences"]))):
+                if isinstance(data["sequences"][i], list):
+                    for j in range(min(len(sequences[i]), len(data["sequences"][i]))):
+                        if isinstance(data["sequences"][i][j], list):
+                            for k in range(min(len(sequences[i][j]), len(data["sequences"][i][j]))):
+                                if data["sequences"][i][j][k] is None or isinstance(data["sequences"][i][j][k], int):
+                                    sequences[i][j][k] = data["sequences"][i][j][k]
+            load_sequence(0)
+    
+    status_label.text = "Complete!"
+    synthiota.pot_leds = [0x00FF00] * 8
+    time.sleep(1)
+    status_label.hidden = True
+    modes_group.hidden = False
+    synthiota.leds.fill(0)
+    synthiota.audio.play(synthiota.mixer)
+    synthiota.mixer.play(effect_reverb)
+
 # loop
 
 last_touched_steps = [False] * 16
@@ -371,6 +484,46 @@ while True:
     synthiota.update()
     sequencer.update()
     touched_steps = synthiota.touched_steps
+
+    # handle save
+    if synthiota.up_button.long_press or synthiota.down_button.long_press:
+
+        # stop sequencer and audio
+        sequencer.active = False
+        synthiota.audio.stop()
+        
+        # clear leds
+        synthiota.leds.fill(0)
+
+        # show label
+        modes_group.hidden = True
+        status_label.text = "Saving..."
+        status_label.hidden = False
+
+        # indicate leds
+        synthiota.pot_leds = [0xFFA500] * 8
+
+        # dump current sequence
+        dump_sequence()
+
+        # perform save
+        save()
+
+        # indicate success
+        status_label.text = "Complete!"
+        synthiota.pot_leds = [0x00FF00] * 8
+        time.sleep(1)
+
+        # reset ui
+        status_label.hidden = True
+        modes_group.hidden = False
+        synthiota.leds.fill(0)
+
+        # continue audio
+        synthiota.audio.play(synthiota.mixer)
+        synthiota.mixer.play(effect_reverb)
+
+        continue # reset loop
 
     step_leds = [0] * 16
 
@@ -435,13 +588,20 @@ while True:
 
     elif mode == MODE_SEQUENCER:
 
-        # TODO: change sequence pattern based on step touch
-        # TODO: indicate current sequence pattern
+        # allow sequence selection
+        for i, value in enumerate(touched_steps):
+            if value and not last_touched_steps[i]:
+                dump_sequence()
+                load_sequence(i)
+                break  # only allow first sequence selection
 
         # indicate sequence length
         for i in range(16):
             if sequencer.loop_start <= i < sequencer.loop_end:
                 step_leds[i] = 0xFF0000
+
+        # indicate current sequence
+        step_leds[current_sequence] = 0x0000FF
 
     # update leds
     step_leds[sequencer.position] = 0x00FF00
