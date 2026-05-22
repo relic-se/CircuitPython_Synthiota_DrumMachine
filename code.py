@@ -357,7 +357,7 @@ def get_save_data() -> dict:
 def save(dump: bool = True) -> None:
     if dump:
         dump_sequence()
-        
+
     with open(SAVE_LOCATION, "w") as f:
         json.dump(get_save_data(), f)
 
@@ -598,7 +598,7 @@ while True:
 
         # allow sequence selection
         for i, value in enumerate(touched_steps):
-            if value and not last_touched_steps[i]:
+            if value and not last_touched_steps[i] and i != current_sequence:
                 next_sequence = i
                 if not sequencer.active:
                     load_sequence()
@@ -611,6 +611,9 @@ while True:
 
         # indicate current sequence
         step_leds[current_sequence] = 0x0000FF
+
+        if next_sequence is not None:
+            step_leds[next_sequence] = 0xFFFF00
 
     # update leds
     step_leds[sequencer.position] = 0x00FF00
