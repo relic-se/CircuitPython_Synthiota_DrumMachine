@@ -445,6 +445,7 @@ else:
     status_label.text = "Loading..."
     status_label.hidden = False
     synthiota.pot_leds = [0xFFA500] * 8
+    synthiota.audio.stop()
 
     with open(SAVE_LOCATION, "r") as f:
         data = json.load(f)
@@ -473,6 +474,8 @@ else:
     status_label.hidden = True
     modes_group.hidden = False
     synthiota.leds.fill(0)
+    synthiota.audio.play(synthiota.mixer)
+    synthiota.mixer.play(effect_reverb)
 
 # loop
 
@@ -487,7 +490,7 @@ while True:
 
         # stop sequencer and audio
         sequencer.active = False
-        synthiota.mixer.stop_voice()
+        synthiota.audio.stop()
         
         # clear leds
         synthiota.leds.fill(0)
@@ -517,6 +520,7 @@ while True:
         synthiota.leds.fill(0)
 
         # continue audio
+        synthiota.audio.play(synthiota.mixer)
         synthiota.mixer.play(effect_reverb)
 
         continue # reset loop
