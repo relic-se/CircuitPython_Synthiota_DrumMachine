@@ -120,12 +120,6 @@ SEQUENCES = 16
 
 sequencer = Sequencer(length=16, tracks=8)
 
-def sequencer_enabled(active: bool) -> None:
-    if not active:
-        for voice in VOICES:
-            voice.release()
-sequencer.on_enabled = sequencer_enabled
-
 def sequencer_press(notenum: int, velocity: float) -> None:
     voice_press(notenum-1, velocity)
 sequencer.on_press = sequencer_press
@@ -168,6 +162,17 @@ def load_sequence(index: int = None, dump: bool = True) -> None:
 
     current_sequence = next_sequence
     next_sequence = None
+
+def sequencer_enabled(active: bool) -> None:
+    if not active:
+        for voice in VOICES:
+            voice.release()
+        load_sequence()
+sequencer.on_enabled = sequencer_enabled
+
+def sequencer_loop(pos: int) -> None:
+    load_sequence()
+sequencer.on_loop = sequencer_loop
 
 # parameters
 PARAM_WINDOW = 0.01
@@ -594,8 +599,9 @@ while True:
         # allow sequence selection
         for i, value in enumerate(touched_steps):
             if value and not last_touched_steps[i]:
-                dump_sequence()
-                load_sequence(i)
+                next_sequence = i
+                if not sequencer.active:
+                    load_sequence()
                 break  # only allow first sequence selection
 
         # indicate sequence length
