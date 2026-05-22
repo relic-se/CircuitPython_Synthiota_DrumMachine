@@ -472,6 +472,7 @@ else:
     time.sleep(1)
     status_label.hidden = True
     modes_group.hidden = False
+    synthiota.leds.fill(0)
 
 # loop
 
