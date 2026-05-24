@@ -501,6 +501,7 @@ while True:
     synthiota.update()
     sequencer.update()
     touched_steps = synthiota.touched_steps
+    touched_steps = touched_steps[8:] + touched_steps[:8]
 
     # handle save
     if synthiota.up_button.long_press or synthiota.down_button.long_press:
@@ -610,22 +611,30 @@ while True:
                     load_sequence()
                 break  # only allow first sequence selection
 
-        # indicate sequence length
         for i in range(16):
+
+            # indicate sequence length
             if sequencer.loop_start <= i < sequencer.loop_end:
                 step_leds[i] = 0xFF0000
 
-        # indicate current sequence
-        step_leds[current_sequence] = 0x0000FF
+            # indicate sequences with active notes
+            for j in range(sequencer.tracks):
+                if any(x is not None for x in sequences[i][j]):
+                    step_leds[i] = 0xFFA500
+                    break
 
+        # indicate current sequence
+        step_leds[current_sequence] = 0xFFFFFF
+
+        # indicate next sequence
         if next_sequence is not None:
-            step_leds[next_sequence] = 0xFFFF00
+            step_leds[next_sequence] = 0x0000FF
 
     # update leds
     step_leds[sequencer.position] = 0x00FF00
     for i in range(16):
         if touched_steps[i]:
             step_leds[i] = 0xFFFF00
-    synthiota.step_leds = step_leds
+    synthiota.step_leds = step_leds[8:] + step_leds[:8]
 
     last_touched_steps[:] = touched_steps
