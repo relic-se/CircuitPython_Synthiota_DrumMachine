@@ -501,6 +501,7 @@ while True:
     synthiota.update()
     sequencer.update()
     touched_steps = synthiota.touched_steps
+    touched_steps = touched_steps[8:] + touched_steps[:8]
 
     # handle save
     if synthiota.up_button.long_press or synthiota.down_button.long_press:
@@ -626,6 +627,6 @@ while True:
     for i in range(16):
         if touched_steps[i]:
             step_leds[i] = 0xFFFF00
-    synthiota.step_leds = step_leds
+    synthiota.step_leds = step_leds[8:] + step_leds[:8]
 
     last_touched_steps[:] = touched_steps
