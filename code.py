@@ -611,16 +611,24 @@ while True:
                     load_sequence()
                 break  # only allow first sequence selection
 
-        # indicate sequence length
         for i in range(16):
+
+            # indicate sequence length
             if sequencer.loop_start <= i < sequencer.loop_end:
                 step_leds[i] = 0xFF0000
 
-        # indicate current sequence
-        step_leds[current_sequence] = 0x0000FF
+            # indicate sequences with active notes
+            for j in range(sequencer.tracks):
+                if any(x is not None for x in sequences[i][j]):
+                    step_leds[i] = 0xFFA500
+                    break
 
+        # indicate current sequence
+        step_leds[current_sequence] = 0xFFFFFF
+
+        # indicate next sequence
         if next_sequence is not None:
-            step_leds[next_sequence] = 0xFFFF00
+            step_leds[next_sequence] = 0x0000FF
 
     # update leds
     step_leds[sequencer.position] = 0x00FF00
