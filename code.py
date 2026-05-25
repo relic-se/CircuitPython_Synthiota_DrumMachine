@@ -2,9 +2,12 @@
 #
 # SPDX-License-Identifier: GPLv3
 
+from audiocore import WaveFile
 from audiodelays import Echo
 from audiofilters import Distortion, DistortionMode, Filter, Phaser
 from audiofreeverb import Freeverb
+from audiomixer import Mixer
+from audiospeed import SpeedChanger
 import displayio
 import json
 import microcontroller
@@ -28,13 +31,79 @@ MODE_LEDS = (0xFF0000, 0x0000FF, 0x00FF00)
 
 # improve performance with an overclock
 microcontroller.cpu.frequency = 320_000_000 if STEREO else 300_000_000
-
-# hardware and audio
+        
+# initialize hardware
 displayio.release_displays()
 synthiota = Synthiota(
-    sample_rate=32000 if STEREO else 48000,
+    sample_rate=32000 if STEREO else 44100,
     channel_count=2 if STEREO else 1,
 )
+
+synth = Synthesizer(
+    sample_rate=synthiota.sample_rate,
+    channel_count=synthiota.channel_count,
+)
+
+# Voices
+
+VOICE_NAMES = [
+    "KICK",
+    "SNRE",
+    "HHCL",
+    "HHOP",
+    "HTOM",
+    "MTOM",
+    "FTOM",
+    "RIDE",
+]
+
+VOICES = [
+    Kick(synth),
+    Snare(synth),
+    ClosedHat(synth),
+    OpenHat(synth),
+    HighTom(synth),
+    MidTom(synth),
+    FloorTom(synth),
+    Ride(synth),
+]
+
+def voice_press(index: int, velocity: float = 1.0) -> None:
+    if 0 <= index < len(VOICES):
+        voice = VOICES[index]
+        if isinstance(voice, SpeedChanger):
+            mixer.voice[index-8].play(voice)
+        else:
+            voice.press(velocity)
+            if index in {2, 3}: # Hat
+                synth.release(VOICES[((index + 1) % 2) + 2].notes)
+
+def voice_release(index: int) -> None:
+    if 0 <= index < len(VOICES):
+        voice = VOICES[index]
+        if isinstance(voice, SpeedChanger):
+            mixer.voice[index-8].end()
+        else:
+            voice.release()
+
+# Samples
+
+SAMPLE_FILENAMES = [x for x in os.listdir("/samples") if not x.startswith(".") and x.endswith(".wav")]
+for filename in os.listdir("/samples"):
+    if filename.startswith(".") or not filename.endswith(".wav"):
+        continue
+
+    wav = WaveFile("/samples/{}".format(filename))
+    if wav.bits_per_sample != 16 or wav.sample_rate != synthiota.sample_rate or wav.channel_count > synthiota.channel_count:
+        print("Invalid sample: {}".format(filename))
+        continue
+
+    VOICE_NAMES.append(filename[:min(len(filename)-len(".wav"), 4)].upper())
+    VOICES.append(SpeedChanger(wav))
+    if len(VOICES) >= 16:
+        break
+
+# setup audio chain
 
 ARGS = {
     "buffer_size": synthiota.buffer_size,
@@ -79,58 +148,27 @@ effect_filter = Filter(
 )
 effect_distortion.play(effect_filter)
 
-synth = Synthesizer(
-    sample_rate=synthiota.sample_rate,
-    channel_count=synthiota.channel_count,
+mixer = Mixer(
+    voice_count=len(VOICES)-7,
+    **ARGS,
 )
-effect_filter.play(synth)
+effect_filter.play(mixer)
 
-# Voices
-
-VOICES = (
-    Kick(synth),
-    Snare(synth),
-    ClosedHat(synth),
-    OpenHat(synth),
-    HighTom(synth),
-    MidTom(synth),
-    FloorTom(synth),
-    Ride(synth),
-)
-
-VOICE_NAMES = (
-    "KICK",
-    "SNRE",
-    "HHCL",
-    "HHOP",
-    "HTOM",
-    "MTOM",
-    "FTOM",
-    "RIDE",
-)
-
-def voice_press(voice: int = None, velocity: float = 1.0) -> None:
-    if 0 <= voice < len(VOICES):
-        VOICES[voice].press(velocity)
-        if voice in {2, 3}: # Hat
-            for note in VOICES[((voice + 1) % 2) + 2].notes:
-                synth.release(note)
+mixer.voice[-1].play(synth)
 
 # Sequencer
 
-SEQUENCES = 16
-
-sequencer = Sequencer(length=16, tracks=8)
+sequencer = Sequencer(length=16, tracks=16)
 
 def sequencer_press(notenum: int, velocity: float) -> None:
     voice_press(notenum-1, velocity)
 sequencer.on_press = sequencer_press
 
 def sequencer_release(notenum: int) -> None:
-    VOICES[notenum-1].release()
+    voice_release(notenum-1)
 sequencer.on_release = sequencer_release
 
-sequences = [[[None for k in range(sequencer.length)] for j in range(sequencer.tracks)] for i in range(SEQUENCES)]
+sequences = [[[None for k in range(sequencer.length)] for j in range(sequencer.tracks)] for i in range(16)]
 current_sequence = 0
 next_sequence = None
 
@@ -153,7 +191,7 @@ def load_sequence(index: int = None, dump: bool = True) -> None:
     if dump:
         dump_sequence()
 
-    next_sequence = min(max(next_sequence, 0), SEQUENCES)
+    next_sequence = min(max(next_sequence, 0), 16)
     
     for i in range(sequencer.tracks):
         for j in range(sequencer.length):
@@ -167,8 +205,8 @@ def load_sequence(index: int = None, dump: bool = True) -> None:
 
 def sequencer_enabled(active: bool) -> None:
     if not active:
-        for voice in VOICES:
-            voice.release()
+        for i in range(len(VOICES)):
+            voice_release(i)
         load_sequence()
 sequencer.on_enabled = sequencer_enabled
 
@@ -274,6 +312,12 @@ PAGES = (
             VOICE_NAMES[i],
             tuple(filter(
                 lambda x: x is not None,
+                (
+                    ("TUN", Parameter(VOICES[i], "rate", 0.5, 2, 1, 2)),
+                    ("LVL", Parameter(mixer.voice[i-8], "level", value=0.5)),
+                    ("PAN", Parameter(mixer.voice[i-8], "panning", -1, 1, 0)) if STEREO else None,
+                )
+                if isinstance(VOICES[i], SpeedChanger) else
                 (
                     ("TUN", Parameter(VOICES[i], "tune", -12, 12, 0)),
                     ("LVL", Parameter(VOICES[i], "amplitude", value=0.5)),
@@ -580,7 +624,7 @@ while True:
             if touched_steps[i] and not last_touched_steps[i]:
                 voice_press(i)
             elif not touched_steps[i] and last_touched_steps[i]:
-                voice.release()
+                voice_release(i)
 
         # indicate voices
         for i in range(len(VOICES)):
