@@ -398,10 +398,11 @@ def get_parameter_data() -> dict:
     return data
 
 def get_save_data() -> dict:
-    global sequences
+    global sequences, current_sequence
     return {
         "parameters": get_parameter_data(),
         "sequences": sequences,
+        "current_sequence": current_sequence,
     }
 
 def save(dump: bool = True) -> None:
@@ -528,6 +529,9 @@ else:
                                 if data["sequences"][i][j][k] is None or isinstance(data["sequences"][i][j][k], int):
                                     sequences[i][j][k] = data["sequences"][i][j][k]
             load_sequence(0, dump=False)
+
+        if "current_sequence" in data and isinstance(data["current_sequence"], int) and 0 <= data["current_sequence"] < 16:
+            load_sequence(data["current_sequence"])
     
     status_label.text = "Complete!"
     synthiota.pot_leds = [0x00FF00] * 8
