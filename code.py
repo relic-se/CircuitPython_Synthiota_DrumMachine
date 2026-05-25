@@ -620,15 +620,15 @@ while True:
             # indicate sequences with active notes
             for j in range(sequencer.tracks):
                 if any(x is not None for x in sequences[i][j]):
-                    step_leds[i] = 0xFFA500
+                    step_leds[i] = 0x800080
                     break
 
         # indicate current sequence
-        step_leds[current_sequence] = 0xFFFFFF
+        step_leds[current_sequence] = 0x0000FF
 
         # indicate next sequence
         if next_sequence is not None:
-            step_leds[next_sequence] = 0x0000FF
+            step_leds[next_sequence] = 0xFFA500
 
     # update leds
     step_leds[sequencer.position] = 0x00FF00
