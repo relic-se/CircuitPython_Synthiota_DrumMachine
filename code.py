@@ -70,7 +70,7 @@ VOICES = [
     Ride(synth),
 ]
 
-def voice_press(index: int, velocity: float = 1.0) -> None:
+def voice_press(index: int, velocity: float = 1.0, midi: bool = True) -> None:
     if 0 <= index < len(VOICES):
         voice = VOICES[index]
         if isinstance(voice, SpeedChanger):
@@ -79,14 +79,18 @@ def voice_press(index: int, velocity: float = 1.0) -> None:
             voice.press(velocity)
             if index in {2, 3}: # Hat
                 synth.release(VOICES[((index + 1) % 2) + 2].notes)
+        if midi:
+            synthiota.send_midi_message(tmidi.Message(tmidi.NOTE_ON, index, int(velocity * 127), channel=MIDI_CHANNEL-1))
 
-def voice_release(index: int) -> None:
+def voice_release(index: int, midi: bool = True) -> None:
     if 0 <= index < len(VOICES):
         voice = VOICES[index]
         if isinstance(voice, SpeedChanger):
             mixer.voice[index-8].end()
         else:
             voice.release()
+        if midi:
+            synthiota.send_midi_message(tmidi.Message(tmidi.NOTE_OFF, index, 0, channel=MIDI_CHANNEL-1))
 
 # Samples
 
@@ -164,12 +168,10 @@ sequencer = Sequencer(length=16, tracks=16)
 
 def sequencer_press(notenum: int, velocity: float) -> None:
     voice_press(notenum-1, velocity)
-    synthiota.send_midi_message(tmidi.Message(tmidi.NOTE_ON, notenum-1, velocity, channel=MIDI_CHANNEL-1))
 sequencer.on_press = sequencer_press
 
 def sequencer_release(notenum: int) -> None:
     voice_release(notenum-1)
-    synthiota.send_midi_message(tmidi.Message(tmidi.NOTE_OFF, notenum-1, 0, channel=MIDI_CHANNEL-1))
 sequencer.on_release = sequencer_release
 
 sequences = [[[None for k in range(sequencer.length)] for j in range(sequencer.tracks)] for i in range(16)]
@@ -701,9 +703,9 @@ while True:
     for msg in synthiota.get_midi_messages():
         if MIDI_CHANNEL == None or msg.channel == MIDI_CHANNEL-1:
             if msg.type == tmidi.NOTE_ON and msg.velocity > 0:
-                voice_press(msg.note)
+                voice_press(msg.note, midi=False)
             elif msg.type == tmidi.NOTE_OFF or (msg.type == tmidi.NOTE_ON and msg.velocity == 0):
-                voice_release(msg.note)
+                voice_release(msg.note, midi=False)
             elif msg.type == tmidi.PROGRAM_CHANGE:
                 prepare_sequence(msg.value)
             elif msg.type == tmidi.START:
