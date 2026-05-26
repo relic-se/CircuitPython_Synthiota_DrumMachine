@@ -21,8 +21,10 @@ from adafruit_display_text.label import Label
 from relic_keymanager import Sequencer
 from relic_synthiota import Synthiota
 from relic_synthvoice.percussive import Kick, Snare, ClosedHat, OpenHat, HighTom, MidTom, FloorTom, Ride
+import tmidi
 
 STEREO = False
+MIDI_CHANNEL = 10
 
 MODE_EDIT = 0
 MODE_SEQUENCER = 1
@@ -68,7 +70,7 @@ VOICES = [
     Ride(synth),
 ]
 
-def voice_press(index: int, velocity: float = 1.0) -> None:
+def voice_press(index: int, velocity: float = 1.0, midi: bool = True) -> None:
     if 0 <= index < len(VOICES):
         voice = VOICES[index]
         if isinstance(voice, SpeedChanger):
@@ -77,14 +79,18 @@ def voice_press(index: int, velocity: float = 1.0) -> None:
             voice.press(velocity)
             if index in {2, 3}: # Hat
                 synth.release(VOICES[((index + 1) % 2) + 2].notes)
+        if midi:
+            synthiota.send_midi_message(tmidi.Message(tmidi.NOTE_ON, index, int(velocity * 127), channel=MIDI_CHANNEL-1))
 
-def voice_release(index: int) -> None:
+def voice_release(index: int, midi: bool = True) -> None:
     if 0 <= index < len(VOICES):
         voice = VOICES[index]
         if isinstance(voice, SpeedChanger):
             mixer.voice[index-8].end()
         else:
             voice.release()
+        if midi:
+            synthiota.send_midi_message(tmidi.Message(tmidi.NOTE_OFF, index, 0, channel=MIDI_CHANNEL-1))
 
 # Samples
 
@@ -202,6 +208,14 @@ def load_sequence(index: int = None, dump: bool = True) -> None:
 
     current_sequence = next_sequence
     next_sequence = None
+
+def prepare_sequence(index: int) -> None:
+    global next_sequence
+    if 0 <= index < 16:
+        if not sequencer.active:
+            load_sequence(index)
+        else:
+            next_sequence = index
 
 def sequencer_enabled(active: bool) -> None:
     if not active:
@@ -654,9 +668,7 @@ while True:
         # allow sequence selection
         for i, value in enumerate(touched_steps):
             if value and not last_touched_steps[i] and i != current_sequence:
-                next_sequence = i
-                if not sequencer.active:
-                    load_sequence()
+                prepare_sequence(i)
                 break  # only allow first sequence selection
 
         for i in range(16):
@@ -686,3 +698,38 @@ while True:
     synthiota.step_leds = step_leds[8:] + step_leds[:8]
 
     last_touched_steps[:] = touched_steps
+
+    # handle midi
+    for msg in synthiota.get_midi_messages():
+        if MIDI_CHANNEL == None or msg.channel == MIDI_CHANNEL-1:
+            if msg.type == tmidi.NOTE_ON and msg.velocity > 0:
+                voice_press(msg.note, midi=False)
+            elif msg.type == tmidi.NOTE_OFF or (msg.type == tmidi.NOTE_ON and msg.velocity == 0):
+                voice_release(msg.note, midi=False)
+            elif msg.type == tmidi.PROGRAM_CHANGE:
+                prepare_sequence(msg.value)
+            elif msg.type == tmidi.START:
+                sequencer.active = True
+                sequencer.position = 0
+            elif msg.type == tmidi.STOP:
+                sequencer.active = False
+            elif msg.type == tmidi.CONTINUE:
+                sequencer.active = True
+            elif msg.type == tmidi.CC:
+                value = msg.data1 / 127.0
+                if msg.data0 == 7:  # Volume
+                    synthiota.mixer.voice[0].level = value
+                elif msg.data0 == 10:  # Pan
+                    synthiota.mixer.voice[0].panning = value * 2.0 - 1.0
+                elif msg.data0 == 71:  # Filter Resonance
+                    right_slider_parameter.raw_value = value
+                elif msg.data0 == 74:  # Filter Frequency
+                    left_slider_parameter.raw_value = value
+                elif msg.data0 == 91:  # Effect 1 Depth
+                    effect_distortion.mix = value
+                elif msg.data0 == 92:  # Effect 2 Depth
+                    effect_phaser.mix = value
+                elif msg.data0 == 93:  # Effect 3 Depth
+                    effect_echo.mix = value
+                elif msg.data0 == 94:  # Effect 4 Depth
+                    effect_reverb.mix = value
