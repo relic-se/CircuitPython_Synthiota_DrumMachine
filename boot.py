@@ -19,6 +19,7 @@ usb_hid.disable()
 usb_cdc.enable(console=True, data=False)
 
 # Rename MIDI interface
+usb_midi.enable()
 usb_midi.set_names(
     streaming_interface_name="synthiota Audio",
     audio_control_interface_name="synthiota MIDI",
