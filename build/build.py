@@ -16,6 +16,7 @@ import requests
 from circup.commands import main as circup_cli
 
 SRC_FILES = [
+    "boot.py",
     "code.py"
 ]
 
