@@ -4,9 +4,16 @@
 
 import os
 import storage
+import supervisor
 import usb_cdc
 import usb_hid
 import usb_midi
+
+# Rename device
+supervisor.set_usb_identification(
+    manufacturer='todbot',
+    product='synthiota',
+)
 
 # Rename drive
 storage.remount("/", readonly=False)
