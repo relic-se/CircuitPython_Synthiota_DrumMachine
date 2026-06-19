@@ -13,6 +13,7 @@ import json
 import microcontroller
 import os
 from synthio import Biquad, FilterMode, LFO, Synthesizer
+import supervisor
 from terminalio import FONT
 import time
 from vectorio import Rectangle
@@ -23,8 +24,8 @@ from relic_synthiota import Synthiota
 from relic_synthvoice.percussive import Kick, Snare, ClosedHat, OpenHat, HighTom, MidTom, FloorTom, Ride
 import tmidi
 
-STEREO = False
-MIDI_CHANNEL = 10
+STEREO = supervisor.get_setting("STEREO", False)
+MIDI_CHANNEL = supervisor.get_setting("MIDI_CHANNEL", 10)
 
 MODE_EDIT = 0
 MODE_SEQUENCER = 1
