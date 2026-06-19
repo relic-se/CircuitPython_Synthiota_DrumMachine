@@ -5,9 +5,12 @@
 import os
 import storage
 import supervisor
+import usb_audio
 import usb_cdc
 import usb_hid
 import usb_midi
+
+STEREO = supervisor.get_setting("STEREO", False)
 
 # Rename device
 supervisor.set_usb_identification(
@@ -32,6 +35,12 @@ usb_midi.set_names(
     audio_control_interface_name="synthiota Audio",
     in_jack_name="synthiota Drum Machine",
     out_jack_name="synthiota Drum Machine",
+)
+
+# Setup USB audio
+usb_audio.enable(
+    sample_rate=32000 if STEREO else 44100,
+    channel_count=2 if STEREO else 1,
 )
 
 # Create samples directory if not found
