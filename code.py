@@ -730,6 +730,7 @@ while True:
             synthiota.send_midi_message(msg)
         
         if MIDI_CHANNEL == None or msg.channel == MIDI_CHANNEL-1:
+            notenum = None
             if msg.type in {tmidi.NOTE_ON, tmidi.NOTE_OFF}:
                 if msg.note < len(VOICES):
                     notenum = msg.note
@@ -737,7 +738,7 @@ while True:
                     try:
                         notenum = next(i for i, x in enumerate(MIDI_MAP) if msg.note in x)
                     except StopIteration:
-                        notenum = None
+                        pass
 
             if notenum is not None and msg.type == tmidi.NOTE_ON and msg.velocity > 0:
                 voice_press(notenum, midi=False)
