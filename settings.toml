@@ -2,6 +2,6 @@
 #
 # SPDX-License-Identifier: GPLv3
 
-USB_AUDIO = false
 STEREO = false
+USB_AUDIO = false
 MIDI_CHANNEL = 10
