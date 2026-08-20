@@ -24,7 +24,19 @@ from relic_synthvoice.percussive import Kick, Snare, ClosedHat, OpenHat, HighTom
 import tmidi
 
 STEREO = False
+
 MIDI_CHANNEL = 10
+MIDI_THRU = True
+MIDI_MAP = (
+    (35, 36),              # Kick
+    (38, 40),              # Snare
+    (42, 44),              # Closed Hi-Hat
+    (46, ),                # Open Hi-Hat
+    (47, 48, 50),          # High Tom
+    (45, ),                # Middle Tom
+    (41, 43),              # Floor Tom
+    (49, 51, 52, 57, 59),  # Ride
+)
 
 MODE_EDIT = 0
 MODE_SEQUENCER = 1
@@ -701,11 +713,25 @@ while True:
 
     # handle midi
     for msg in synthiota.get_midi_messages():
+
+        # MIDI Thru
+        if MIDI_THRU:
+            synthiota.send_midi_message(msg)
+        
         if MIDI_CHANNEL == None or msg.channel == MIDI_CHANNEL-1:
-            if msg.type == tmidi.NOTE_ON and msg.velocity > 0:
-                voice_press(msg.note, midi=False)
-            elif msg.type == tmidi.NOTE_OFF or (msg.type == tmidi.NOTE_ON and msg.velocity == 0):
-                voice_release(msg.note, midi=False)
+            if msg.type in {tmidi.NOTE_ON, tmidi.NOTE_OFF}:
+                if msg.note < len(VOICES):
+                    notenum = msg.note
+                else:
+                    try:
+                        notenum = next(i for i, x in enumerate(MIDI_MAP) if msg.note in x)
+                    except StopIteration:
+                        notenum = None
+
+            if notenum is not None and msg.type == tmidi.NOTE_ON and msg.velocity > 0:
+                voice_press(notenum, midi=False)
+            elif notenum is not None and (msg.type == tmidi.NOTE_OFF or (msg.type == tmidi.NOTE_ON and msg.velocity == 0)):
+                voice_release(notenum, midi=False)
             elif msg.type == tmidi.PROGRAM_CHANGE:
                 prepare_sequence(msg.value)
             elif msg.type == tmidi.START:
