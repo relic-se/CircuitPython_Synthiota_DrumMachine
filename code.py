@@ -25,6 +25,7 @@ import tmidi
 
 STEREO = False
 MIDI_CHANNEL = 10
+MIDI_THRU = True
 
 MODE_EDIT = 0
 MODE_SEQUENCER = 1
@@ -701,6 +702,12 @@ while True:
 
     # handle midi
     for msg in synthiota.get_midi_messages():
+
+        # MIDI Thru
+        if MIDI_THRU:
+            synthiota.send_midi_message(msg)
+
+        
         if MIDI_CHANNEL == None or msg.channel == MIDI_CHANNEL-1:
             if msg.type == tmidi.NOTE_ON and msg.velocity > 0:
                 voice_press(msg.note, midi=False)
