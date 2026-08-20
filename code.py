@@ -35,7 +35,7 @@ MODE_LEDS = (0xFF0000, 0x0000FF, 0x00FF00)
 
 # improve performance with an overclock
 microcontroller.cpu.frequency = 320_000_000 if STEREO else 300_000_000
-        
+
 # initialize hardware
 displayio.release_displays()
 synthiota = Synthiota(
@@ -100,10 +100,7 @@ def voice_release(index: int, midi: bool = True) -> None:
 # Samples
 
 SAMPLE_FILENAMES = [x for x in os.listdir("/samples") if not x.startswith(".") and x.endswith(".wav")]
-for filename in os.listdir("/samples"):
-    if filename.startswith(".") or not filename.endswith(".wav"):
-        continue
-
+for filename in SAMPLE_FILENAMES:
     wav = WaveFile("/samples/{}".format(filename))
     if wav.bits_per_sample != 16 or wav.sample_rate != synthiota.sample_rate or wav.channel_count > synthiota.channel_count:
         print("Invalid sample: {}".format(filename))
