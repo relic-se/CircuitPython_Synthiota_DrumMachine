@@ -33,7 +33,7 @@ else:
     RESAMPLE = True
 
 STEREO = supervisor.get_setting("STEREO", False)
-USB_AUDIO = supervisor.get_setting("USB_AUDIO", False)
+USB_AUDIO = supervisor.get_setting("USB_AUDIO", False) if usb_microphone is not None else False
 
 MIDI_CHANNEL = supervisor.get_setting("MIDI_CHANNEL", 10)
 MIDI_THRU = supervisor.get_setting("MIDI_THRU", True)
@@ -59,12 +59,12 @@ microcontroller.cpu.frequency = 320_000_000 if STEREO else 300_000_000
 # initialize hardware
 displayio.release_displays()
 synthiota = Synthiota(
-    sample_rate=32000 if STEREO else 44100,
+    sample_rate=(32000 if STEREO else 44100) // (1 + USB_AUDIO),
     channel_count=2 if STEREO else 1,
 )
 
 # determine audio output (usb audio or line output)
-audio = usb_microphone if USB_AUDIO and usb_microphone is not None else synthiota.audio
+audio = usb_microphone if USB_AUDIO else synthiota.audio
 audio.play(synthiota.mixer)
 
 synth = Synthesizer(

@@ -41,7 +41,7 @@ usb_midi.set_names(
 # Setup USB audio
 if USB_AUDIO:
     usb_audio.enable(
-        sample_rate=32000 if STEREO else 44100,
+        sample_rate=(32000 if STEREO else 44100) // (1 + USB_AUDIO),
         channel_count=2 if STEREO else 1,
         microphone=True,
         speaker=False,
