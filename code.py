@@ -36,7 +36,7 @@ STEREO = supervisor.get_setting("STEREO", False)
 USB_AUDIO = supervisor.get_setting("USB_AUDIO", False)
 
 MIDI_CHANNEL = supervisor.get_setting("MIDI_CHANNEL", 10)
-MIDI_THRU = True
+MIDI_THRU = supervisor.get_setting("MIDI_THRU", True)
 MIDI_MAP = (
     (35, 36),              # Kick
     (38, 40),              # Snare

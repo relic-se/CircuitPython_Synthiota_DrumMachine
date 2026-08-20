@@ -5,3 +5,4 @@
 STEREO = false
 USB_AUDIO = false
 MIDI_CHANNEL = 10
+MIDI_THRU = true
