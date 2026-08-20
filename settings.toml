@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Cooper Dalrymple (@relic-se)
+#
+# SPDX-License-Identifier: GPLv3
+
+STEREO = false
+USB_AUDIO = false
+MIDI_CHANNEL = 10
+MIDI_THRU = true

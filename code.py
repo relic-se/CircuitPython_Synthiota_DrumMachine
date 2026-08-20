@@ -13,8 +13,10 @@ import json
 import microcontroller
 import os
 from synthio import Biquad, FilterMode, LFO, Synthesizer
+import supervisor
 from terminalio import FONT
 import time
+from usb_audio import usb_microphone
 from vectorio import Rectangle
 
 from adafruit_display_text.label import Label
@@ -30,10 +32,11 @@ except ImportError:
 else:
     RESAMPLE = True
 
-STEREO = False
+STEREO = supervisor.get_setting("STEREO", False)
+USB_AUDIO = supervisor.get_setting("USB_AUDIO", False) if usb_microphone is not None else False
 
-MIDI_CHANNEL = 10
-MIDI_THRU = True
+MIDI_CHANNEL = supervisor.get_setting("MIDI_CHANNEL", 10)
+MIDI_THRU = supervisor.get_setting("MIDI_THRU", True)
 MIDI_MAP = (
     (35, 36),              # Kick
     (38, 40),              # Snare
@@ -52,13 +55,17 @@ MODE_LEDS = (0xFF0000, 0x0000FF, 0x00FF00)
 
 # improve performance with an overclock
 microcontroller.cpu.frequency = 320_000_000 if STEREO else 300_000_000
-        
+
 # initialize hardware
 displayio.release_displays()
 synthiota = Synthiota(
-    sample_rate=32000 if STEREO else 44100,
+    sample_rate=(32000 if STEREO else 44100) // (1 + USB_AUDIO),
     channel_count=2 if STEREO else 1,
 )
+
+# determine audio output (usb audio or line output)
+audio = usb_microphone if USB_AUDIO else synthiota.audio
+audio.play(synthiota.mixer)
 
 synth = Synthesizer(
     sample_rate=synthiota.sample_rate,
@@ -116,10 +123,7 @@ def voice_release(index: int, midi: bool = True) -> None:
 # Samples
 
 SAMPLE_FILENAMES = [x for x in os.listdir("/samples") if not x.startswith(".") and x.endswith(".wav")]
-for filename in os.listdir("/samples"):
-    if filename.startswith(".") or not filename.endswith(".wav"):
-        continue
-
+for filename in SAMPLE_FILENAMES:
     wav = WaveFile("/samples/{}".format(filename))
     if wav.bits_per_sample != 16 or wav.channel_count > synthiota.channel_count or (not RESAMPLE and wav.sample_rate != synthiota.sample_rate):
         print("Invalid sample: {}".format(filename))
@@ -542,7 +546,7 @@ else:
     status_label.text = "Loading..."
     status_label.hidden = False
     synthiota.pot_leds = [0xFFA500] * 8
-    synthiota.audio.stop()
+    audio.stop()
 
     with open(SAVE_LOCATION, "r") as f:
         data = json.load(f)
@@ -574,8 +578,7 @@ else:
     status_label.hidden = True
     modes_group.hidden = False
     synthiota.leds.fill(0)
-    synthiota.audio.play(synthiota.mixer)
-    synthiota.mixer.play(effect_reverb)
+    audio.play(synthiota.mixer)
 
 # loop
 
@@ -591,7 +594,7 @@ while True:
 
         # stop sequencer and audio
         sequencer.active = False
-        synthiota.audio.stop()
+        audio.stop()
         
         # clear leds
         synthiota.leds.fill(0)
@@ -618,8 +621,7 @@ while True:
         synthiota.leds.fill(0)
 
         # continue audio
-        synthiota.audio.play(synthiota.mixer)
-        synthiota.mixer.play(effect_reverb)
+        audio.play(synthiota.mixer)
 
         continue # reset loop
 
