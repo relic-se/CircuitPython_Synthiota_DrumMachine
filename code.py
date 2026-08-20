@@ -16,7 +16,7 @@ from synthio import Biquad, FilterMode, LFO, Synthesizer
 import supervisor
 from terminalio import FONT
 import time
-from usb_audio import USBMicrophone
+from usb_audio import usb_microphone
 from vectorio import Rectangle
 
 from adafruit_display_text.label import Label
@@ -26,6 +26,7 @@ from relic_synthvoice.percussive import Kick, Snare, ClosedHat, OpenHat, HighTom
 import tmidi
 
 STEREO = supervisor.get_setting("STEREO", False)
+USB_AUDIO = supervisor.get_setting("USB_AUDIO", False)
 MIDI_CHANNEL = supervisor.get_setting("MIDI_CHANNEL", 10)
 
 MODE_EDIT = 0
@@ -43,8 +44,9 @@ synthiota = Synthiota(
     channel_count=2 if STEREO else 1,
 )
 
-usb_audio = USBMicrophone()
-usb_audio.play(synthiota.mixer)
+# determine audio output (usb audio or line output)
+audio = usb_microphone if USB_AUDIO and usb_microphone is not None else synthiota.audio
+audio.play(synthiota.mixer)
 
 synth = Synthesizer(
     sample_rate=synthiota.sample_rate,
@@ -523,8 +525,7 @@ else:
     status_label.text = "Loading..."
     status_label.hidden = False
     synthiota.pot_leds = [0xFFA500] * 8
-    synthiota.audio.stop()
-    usb_audio.stop()
+    audio.stop()
 
     with open(SAVE_LOCATION, "r") as f:
         data = json.load(f)
@@ -556,9 +557,7 @@ else:
     status_label.hidden = True
     modes_group.hidden = False
     synthiota.leds.fill(0)
-    synthiota.audio.play(synthiota.mixer)
-    usb_audio.play(synthiota.mixer)
-    synthiota.mixer.play(effect_reverb)
+    audio.play(synthiota.mixer)
 
 # loop
 
@@ -574,8 +573,7 @@ while True:
 
         # stop sequencer and audio
         sequencer.active = False
-        synthiota.audio.stop()
-        usb_audio.stop()
+        audio.stop()
         
         # clear leds
         synthiota.leds.fill(0)
@@ -602,9 +600,7 @@ while True:
         synthiota.leds.fill(0)
 
         # continue audio
-        synthiota.audio.play(synthiota.mixer)
-        usb_audio.play(synthiota.mixer)
-        synthiota.mixer.play(effect_reverb)
+        audio.play(synthiota.mixer)
 
         continue # reset loop
 

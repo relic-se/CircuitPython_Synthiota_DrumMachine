@@ -11,6 +11,7 @@ import usb_hid
 import usb_midi
 
 STEREO = supervisor.get_setting("STEREO", False)
+USB_AUDIO = supervisor.get_setting("USB_AUDIO", False)
 
 # Rename device
 supervisor.set_usb_identification(
@@ -38,10 +39,13 @@ usb_midi.set_names(
 )
 
 # Setup USB audio
-usb_audio.enable(
-    sample_rate=32000 if STEREO else 44100,
-    channel_count=2 if STEREO else 1,
-)
+if USB_AUDIO:
+    usb_audio.enable(
+        sample_rate=32000 if STEREO else 44100,
+        channel_count=2 if STEREO else 1,
+        microphone=True,
+        speaker=False,
+    )
 
 # Create samples directory if not found
 try:
