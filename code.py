@@ -25,9 +25,28 @@ from relic_synthiota import Synthiota
 from relic_synthvoice.percussive import Kick, Snare, ClosedHat, OpenHat, HighTom, MidTom, FloorTom, Ride
 import tmidi
 
+try:
+    from audiospeed import Resampler
+except ImportError:
+    RESAMPLE = False
+else:
+    RESAMPLE = True
+
 STEREO = supervisor.get_setting("STEREO", False)
 USB_AUDIO = supervisor.get_setting("USB_AUDIO", False)
+
 MIDI_CHANNEL = supervisor.get_setting("MIDI_CHANNEL", 10)
+MIDI_THRU = True
+MIDI_MAP = (
+    (35, 36),              # Kick
+    (38, 40),              # Snare
+    (42, 44),              # Closed Hi-Hat
+    (46, ),                # Open Hi-Hat
+    (47, 48, 50),          # High Tom
+    (45, ),                # Middle Tom
+    (41, 43),              # Floor Tom
+    (49, 51, 52, 57, 59),  # Ride
+)
 
 MODE_EDIT = 0
 MODE_SEQUENCER = 1
@@ -81,6 +100,8 @@ def voice_press(index: int, velocity: float = 1.0, midi: bool = True) -> None:
     if 0 <= index < len(VOICES):
         voice = VOICES[index]
         if isinstance(voice, SpeedChanger):
+            if RESAMPLE and voice.sample_rate != mixer.sample_rate:
+                voice = Resampler(voice)
             mixer.voice[index-8].play(voice)
         else:
             voice.press(velocity)
@@ -104,7 +125,7 @@ def voice_release(index: int, midi: bool = True) -> None:
 SAMPLE_FILENAMES = [x for x in os.listdir("/samples") if not x.startswith(".") and x.endswith(".wav")]
 for filename in SAMPLE_FILENAMES:
     wav = WaveFile("/samples/{}".format(filename))
-    if wav.bits_per_sample != 16 or wav.sample_rate != synthiota.sample_rate or wav.channel_count > synthiota.channel_count:
+    if wav.bits_per_sample != 16 or wav.channel_count > synthiota.channel_count or (not RESAMPLE and wav.sample_rate != synthiota.sample_rate):
         print("Invalid sample: {}".format(filename))
         continue
 
@@ -703,11 +724,25 @@ while True:
 
     # handle midi
     for msg in synthiota.get_midi_messages():
+
+        # MIDI Thru
+        if MIDI_THRU:
+            synthiota.send_midi_message(msg)
+        
         if MIDI_CHANNEL == None or msg.channel == MIDI_CHANNEL-1:
-            if msg.type == tmidi.NOTE_ON and msg.velocity > 0:
-                voice_press(msg.note, midi=False)
-            elif msg.type == tmidi.NOTE_OFF or (msg.type == tmidi.NOTE_ON and msg.velocity == 0):
-                voice_release(msg.note, midi=False)
+            if msg.type in {tmidi.NOTE_ON, tmidi.NOTE_OFF}:
+                if msg.note < len(VOICES):
+                    notenum = msg.note
+                else:
+                    try:
+                        notenum = next(i for i, x in enumerate(MIDI_MAP) if msg.note in x)
+                    except StopIteration:
+                        notenum = None
+
+            if notenum is not None and msg.type == tmidi.NOTE_ON and msg.velocity > 0:
+                voice_press(notenum, midi=False)
+            elif notenum is not None and (msg.type == tmidi.NOTE_OFF or (msg.type == tmidi.NOTE_ON and msg.velocity == 0)):
+                voice_release(notenum, midi=False)
             elif msg.type == tmidi.PROGRAM_CHANGE:
                 prepare_sequence(msg.value)
             elif msg.type == tmidi.START:
