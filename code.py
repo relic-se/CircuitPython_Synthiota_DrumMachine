@@ -23,6 +23,13 @@ from relic_synthiota import Synthiota
 from relic_synthvoice.percussive import Kick, Snare, ClosedHat, OpenHat, HighTom, MidTom, FloorTom, Ride
 import tmidi
 
+try:
+    from audiospeed import Resampler
+except ImportError:
+    RESAMPLE = False
+else:
+    RESAMPLE = True
+
 STEREO = False
 
 MIDI_CHANNEL = 10
@@ -86,6 +93,8 @@ def voice_press(index: int, velocity: float = 1.0, midi: bool = True) -> None:
     if 0 <= index < len(VOICES):
         voice = VOICES[index]
         if isinstance(voice, SpeedChanger):
+            if RESAMPLE and voice.sample_rate != mixer.sample_rate:
+                voice = Resampler(voice)
             mixer.voice[index-8].play(voice)
         else:
             voice.press(velocity)
@@ -112,7 +121,7 @@ for filename in os.listdir("/samples"):
         continue
 
     wav = WaveFile("/samples/{}".format(filename))
-    if wav.bits_per_sample != 16 or wav.sample_rate != synthiota.sample_rate or wav.channel_count > synthiota.channel_count:
+    if wav.bits_per_sample != 16 or wav.channel_count > synthiota.channel_count or (not RESAMPLE and wav.sample_rate != synthiota.sample_rate):
         print("Invalid sample: {}".format(filename))
         continue
 
